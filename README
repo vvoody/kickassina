@@ -34,7 +34,8 @@ HOW
 
          http://t.sina.cn/dpool/ttt/mblogDeal.php?st=XXXX&st=XXXX&gsid=AABBBCCDD
 
-       务必填写并且正确，否则同步无法成功。
+       ** 务必填写并且正确，否则同步无法成功;
+       ** 这两个字符串自己用没问题，泄露给别人会有安全隐患;
 
 4. 部署kickassina到GAE
 
