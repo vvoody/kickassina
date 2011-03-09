@@ -40,3 +40,4 @@ skip_files:
 - ^(.*/)?\.git/
 - ^(.*/)?test/
 - ^(.*/)?webhost/
+- ^(.*/)?README

@@ -1,0 +1,95 @@
+====
+What
+====
+同步twitter到新浪微博，基于Google App Engine。
+
+====
+Why
+====
+类似同步程序不少，但他们需要twitter密码、新浪密码、新浪api key。
+这也没什么，关键新浪会封api key导致无法使用。因此折腾了下找到了个
+不需要上述任何条件的方法来实现同步。
+
+===
+HOW
+===
+1. 访问 http://t.sina.cn/ ，并登录成功回到首页;
+
+   请使用Opera浏览器访问，其他绝大多数浏览器会提示将页面保存为
+   php文件，将无法顺利登录。
+
+2. 查看首页源码，找到"gsid="开头的字符串，以及"st="，记录下他们的值;
+
+3. 下载kickassina源码
+
+   3.1 https://github.com/vvoody/kickassina/archives/master
+
+   3.2 编辑main.py，修改源码顶部两个变量"USER_ID"和"REQ_URL"
+
+       USER_ID可以在下面的地址获得，最前面的<id>就是：
+
+         http://api.twitter.com/1/users/show.xml?screen_name=YOURNAME
+
+       REQ_URL由第二步中的两个字符串组成，将值分别填入相应位置：
+
+         http://t.sina.cn/dpool/ttt/mblogDeal.php?st=XXXX&st=XXXX&gsid=AABBBCCDD
+
+       务必填写并且正确，否则同步无法成功。
+
+4. 部署kickassina到GAE
+
+   请参考同类教程
+
+====
+MORE
+====
+同步策略：
+
+  * 每10分钟从你的用户timeline抓取tweets，滤除你回复别人的tweets，并保存到数据库;
+
+  * 每1分钟从数据库中取出还没有被同步的tweet同步到新浪;
+
+    每次至多同步一条，并且是未同步tweets中时间最早的一条。
+
+Tips:
+
+部署完了kickassina，理论要至少10分钟后才开始抓取tweets并同步，但你可以手工触发：
+
+   1. 访问 http://xxxxx.appspot.com/fetchtweets
+
+      一次从twitter抓取0~20条tweet，具体数量取决于回复别人的推有多少;
+      不要过于频繁访问该页面，twitter有请求限制;
+      需要admin登录后才能访问;
+
+   2. 访问 http://xxxxx.appspot.com/kickass
+
+      同步一条tweet;
+
+上述两个页面是给cron来调用，用户一般不需要通过web页面访问，所以提示信息较少。
+详细debug信息请访问appengine后台管理界面。
+
+GAE的fetchurl最大请求超时时间是10秒，因此你很有可能经常在后台看到下面的提示，
+
+    urlfetch: ApplicationError: 5
+
+kickassina对于这种情况会继续不断请求上次未成功的请求直到成功。鉴于urlfetch
+超时时间太短，可以在其他web空间用curl命令配合cron来替代，但抓取tweets部分
+依然基于GAE。方法如下：
+
+    1. 编写shell脚本，内容如下：
+
+       #!/bin/sh
+       content=$(curl http://xxxxxx.appspot.com/lasttweet)
+       if [ ! "$content" = "" ]; then
+           curl -L -F "act=add" -F "rl=0" -F "content=" \
+                http://t.sina.cn/dpool/ttt/mblogDeal.php?st=XXXX&st=XXXX&gsid=AABBBCCDD
+       fi
+
+    2. 添加上述shell脚本到cron
+
+OK.
+
+另外，有些使用urlfetch请求成功了，但是没有见到你的tweet，那么很有可能是
+新浪对微博的审查，触发某些敏感词了。这时kickassina会标记这些tweets为
+failed，进入下一次同步会忽略它们。目前还没有接口给这些failed的tweets
+再一次同步的机会。
