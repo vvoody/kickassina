@@ -1,0 +1,7 @@
+cron:
+- description:
+  url: /kickass
+  schedule: every 1 minutes
+- description:
+  url: /fetchtweets
+  schedule: every 10 minutes
