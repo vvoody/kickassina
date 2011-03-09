@@ -36,7 +36,10 @@ class LasttweetHandler(webapp.RequestHandler):
 
     def get(self):
         lasttweet = self.last_tweet()
-        self.response.out.write(lasttweet.tweet)
+        if lasttweet is None:
+            self.response.out.write('')
+        else:
+            self.response.out.write(lasttweet.tweet)
 
 
 class FetchtweetsHandler(webapp.RequestHandler):
@@ -45,9 +48,15 @@ class FetchtweetsHandler(webapp.RequestHandler):
         global USER_ID
         req = 'http://api.twitter.com/1/statuses/user_timeline.json?user_id=%d&trim_user=true&include_rts=true&since_id=%d' % (USER_ID, sid)
         try:
-            res = urlfetch.fetch(req)
+            res = urlfetch.fetch(url=req, deadline=10)
         except Exception, e:
             logging.error("fetch: %s" % e)
+            return
+
+        if res.status_code != 200:
+            msg = "twitter api maybe request too much."
+            logging.info(msg)
+            self.response.out.write(msg)
             return
 
         tweets = json.loads(res.content)
@@ -90,8 +99,9 @@ class KickassHandler(webapp.RequestHandler):
         form_fields = {'act': 'add', 'rl': '0', 'content': t.tweet.encode('utf-8')}
         form_data = urllib.urlencode(form_fields)
         try:
-            result = urlfetch.fetch(url=REQ_URL,
-                                    payload=form_data, method=urlfetch.POST, headers=headers)
+            result = urlfetch.fetch(url=REQ_URL, payload=form_data,
+                                    method=urlfetch.POST, headers=headers,
+                                    deadline=10)
         except Exception, e:
             logging.error("urlfetch: %s" % e)
             return
@@ -107,7 +117,6 @@ application = webapp.WSGIApplication([('/kickass', KickassHandler),
                                       ('/lasttweet', LasttweetHandler),
                                       ('/fetchtweets', FetchtweetsHandler),
                                       ('/.*', MainPage)], debug=True)
-
 
 def main():
     run_wsgi_app(application)
