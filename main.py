@@ -20,11 +20,39 @@ class DB(db.Model):
     tweet = db.StringProperty()
     user_id = db.IntegerProperty()
     failed = db.BooleanProperty(default=False)    # bloody damn censorship
+    whyfailed = db.TextProperty()
 
 
 class MainPage(webapp.RequestHandler):
     def get(self):
         self.response.out.write("fair enough")
+
+
+class WhyfailedPage(webapp.RequestHandler):
+    def get_failed_tweets(self):
+        return DB.all().filter('failed', True).order('-tweet_id')
+
+    def get(self, tid):
+        if tid:
+            k = DB.get_by_id(int(tid))
+            if k is not None:
+                self.response.out.write("%s" % k.whyfailed)
+        else:
+            failed_tweets = self.get_failed_tweets()
+            self.response.out.write("""
+            <html>
+            <body>""")
+
+            for t in failed_tweets:
+                id_ = t.key().id()
+                self.response.out.write("""
+                <a href="/whyfailed/%s">%d</a>
+                """ % (id_, id_))
+
+            self.response.out.write("""
+            </body>
+            </html>
+            """)
 
 
 class LasttweetHandler(webapp.RequestHandler):
@@ -91,7 +119,7 @@ class KickassHandler(webapp.RequestHandler):
 
         t = LasttweetHandler.last_tweet()
         if t is None:
-            logging.info("No tweet to kick.")
+            self.response.out.write("No tweet to kick.")
             return
 
         headers = {'Content-Type': 'application/x-www-form-urlencoded',
@@ -103,12 +131,18 @@ class KickassHandler(webapp.RequestHandler):
                                     method=urlfetch.POST, headers=headers,
                                     deadline=10)
         except Exception, e:
-            logging.error("urlfetch: %s" % e)
+            logging.error("kicked: %s\n%s" % (e, t.tweet))
             return
+
+        msg = "Kicked!"
 
         # tweet may be censored
         if result.content.find("发布成功!") == -1:
             t.failed = True
+            t.whyfailed = result.content.decode("utf-8")
+            msg += " But maybe censored!"
+
+        logging.info(msg)
         t.kicked = True
         t.put()
 
@@ -116,6 +150,7 @@ class KickassHandler(webapp.RequestHandler):
 application = webapp.WSGIApplication([('/kickass', KickassHandler),
                                       ('/lasttweet', LasttweetHandler),
                                       ('/fetchtweets', FetchtweetsHandler),
+                                      ('/whyfailed/(.*)', WhyfailedPage),
                                       ('/.*', MainPage)], debug=True)
 
 def main():

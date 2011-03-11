@@ -16,3 +16,9 @@ indexes:
   - name: kicked
   - name: tweet_id
     direction: desc
+
+- kind: DB
+  properties:
+  - name: failed
+  - name: tweet_id
+    direction: desc

@@ -1,5 +1,5 @@
 application: kickassina
-version: 1
+version: 2
 runtime: python
 api_version: 1
 
@@ -21,6 +21,9 @@ handlers:
   script: main.py
 # cron, fetch bunch of tweets and save into datastore
 - url: /fetchtweets
+  script: main.py
+  login: admin
+- url: /whyfailed/.*
   script: main.py
   login: admin
 - url: /.*
