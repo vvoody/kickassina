@@ -19,8 +19,9 @@ class DB(db.Model):
     tweet_id = db.IntegerProperty()
     tweet = db.StringProperty()
     user_id = db.IntegerProperty()
-    failed = db.BooleanProperty(default=False)    # bloody damn censorship
+    failed = db.BooleanProperty(default=False)    # bloody damn censorship or sina's block
     whyfailed = db.TextProperty()
+    tried_times = db.IntegerProperty(default=0)
 
 
 class MainPage(webapp.RequestHandler):
@@ -60,7 +61,7 @@ class LasttweetHandler(webapp.RequestHandler):
     def last_tweet(cls):
         # 'lasttweet' here doesn't mean the latest tweet,
         # it's the next tweet to kick
-        return DB.all().filter('kicked', False).filter('failed', False).order('-tweet_id').get()
+        return DB.all().filter('kicked', False).filter('failed', False).order('tweet_id').get()
 
     def get(self):
         lasttweet = self.last_tweet()
@@ -132,25 +133,35 @@ class KickassHandler(webapp.RequestHandler):
                                     deadline=10)
         except Exception, e:
             logging.error("kicked: %s\n%s" % (e, t.tweet))
+            self.response.out.write("%s" % "urlfetch failed...")
             return
 
         msg = "Kicked!"
 
         # tweet may be censored
         if result.content.find("发布成功!") == -1:
-            t.failed = True
             t.whyfailed = result.content.decode("utf-8")
-            msg += " But maybe censored!"
+            t.tried_times += 1
+            msg += " But maybe blocked or censored! Try again next time."
+        else:
+            t.kicked = True
 
         logging.info(msg)
-        t.kicked = True
         t.put()
 
+
+class SetfailedHandler(webapp.RequestHandler):
+    def get(self):
+        tweets = DB.all().filter('tried_times >', 4)
+        for t in tweets:
+            t.failed = True
+            t.put()
 
 application = webapp.WSGIApplication([('/kickass', KickassHandler),
                                       ('/lasttweet', LasttweetHandler),
                                       ('/fetchtweets', FetchtweetsHandler),
                                       ('/whyfailed/(.*)', WhyfailedPage),
+                                      ('/setfailed', SetfailedHandler),
                                       ('/.*', MainPage)], debug=True)
 
 def main():
