@@ -17,7 +17,7 @@ REQ_URL=None
 class DB(db.Model):
     kicked = db.BooleanProperty(default=False)
     tweet_id = db.IntegerProperty()
-    tweet = db.StringProperty()
+    tweet = db.StringProperty(multiline=True)
     user_id = db.IntegerProperty()
     failed = db.BooleanProperty(default=False)    # bloody damn censorship or sina's block
     whyfailed = db.TextProperty()
