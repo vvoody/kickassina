@@ -1,5 +1,5 @@
 application: kickassina
-version: 5
+version: 6
 runtime: python
 api_version: 1
 
@@ -16,7 +16,13 @@ handlers:
 - url: /kickass
   script: main.py
   login: admin
-# get last non-reply tweet, can be called by remote(web host cron job)
+# next tweet to be kicked(not latest one)
+- url: /nexttweet
+  script: main.py
+# latest tweet(not to be kicked immediately)
+- url: /lastesttweet
+  script: main.py
+# status of last tweet tried to kick
 - url: /lasttweet
   script: main.py
 # cron, fetch bunch of tweets and save into datastore

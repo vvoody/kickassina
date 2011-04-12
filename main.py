@@ -56,20 +56,54 @@ class WhyfailedPage(webapp.RequestHandler):
             """)
 
 
-class LasttweetHandler(webapp.RequestHandler):
+class NexttweetHandler(webapp.RequestHandler):
     @classmethod
-    def last_tweet(cls):
-        # 'lasttweet' here doesn't mean the latest tweet,
-        # it's the next tweet to kick
+    def next_tweet(cls):
+        # next tweet to be kicked
         return DB.all().filter('kicked', False).filter('failed', False).order('tweet_id').get()
 
     def get(self):
-        lasttweet = self.last_tweet()
-        if lasttweet is None:
+        nexttweet = self.next_tweet()
+        if nexttweet is None:
             self.response.out.write('')
         else:
-            self.response.out.write(lasttweet.tweet)
+            self.response.out.write(nexttweet.tweet)
 
+
+class LatesttweetHandler(webapp.RequestHandler):
+    @classmethod
+    def lastest_tweet(cls):
+        # latest tweet not kicked(maybe not to be kicked immediately)
+        return DB.all().filter('kicked', False).filter('failed', False).order('-tweet_id').get()
+
+    def get(self):
+        lastest = self.lastest_tweet()
+        if lastest is None:
+            self.response.out.write('')
+        else:
+            self.response.out.write(lastest.tweet)
+
+
+class LasttweetHandler(webapp.RequestHandler):
+    @classmethod
+    def last_tweet(cls):
+        # last tweet which has been tried to kick(maybe kicked or failed or both)
+        # it's not easy to get !(failed == False and kicked == False),
+        # so the tweet whose id is smaller than the next tweet is what we want.
+        next_ = NexttweetHandler.next_tweet()
+        if next_ is None:  # not tweets in the kick peeding
+            return DB.all().order('-tweet_id').get()
+        else:
+            return DB.all().filter('tweet_id <', next_.tweet_id).order('-tweet_id').get()
+
+    def get(self):
+        last = self.last_tweet()
+        if last is None:
+            self.response.out.write('')
+        else:
+            self.response.out.write('Failed: %s <|> ' % last.failed)
+            self.response.out.write('Kicked: %s <|> ' % last.kicked)
+            self.response.out.write(last.tweet)
 
 class FetchtweetsHandler(webapp.RequestHandler):
     # fetch user's tweets which are not reply to anyone
@@ -118,7 +152,7 @@ class KickassHandler(webapp.RequestHandler):
     def get(self):
         global REQ_URL
 
-        t = LasttweetHandler.last_tweet()
+        t = NexttweetHandler.next_tweet()
         if t is None:
             self.response.out.write("No tweet to kick.")
             return
@@ -158,6 +192,8 @@ class SetfailedHandler(webapp.RequestHandler):
             t.put()
 
 application = webapp.WSGIApplication([('/kickass', KickassHandler),
+                                      ('/nexttweet', NexttweetHandler),
+                                      ('/latesttweet', LatesttweetHandler),
                                       ('/lasttweet', LasttweetHandler),
                                       ('/fetchtweets', FetchtweetsHandler),
                                       ('/whyfailed/(.*)', WhyfailedPage),
