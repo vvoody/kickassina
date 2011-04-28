@@ -166,7 +166,13 @@ class KickassHandler(webapp.RequestHandler):
         # match WEIBO_GSID">微博[362]</a>
         patt = r'%s">微博\[(\d+)\]</a>' % WEIBO_GSID
         v = re.search(patt, res.content)
-        return int(v.group(1))
+        try:
+            count = int(v.group(1))
+        except Exception, e:
+            logging.error("get count error: \n%s" % res.content)
+            raise Exception(e)
+
+        return count
 
     def get(self):
         global TRIED_TIMES_MAX, WEIBO_KICK_URL, WEIBO_KICK_URL_DEADLINE
