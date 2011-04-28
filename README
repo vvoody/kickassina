@@ -24,22 +24,21 @@ HOW
 
    3.1 https://github.com/vvoody/kickassina/archives/master
 
-   3.2 编辑main.py，修改源码顶部两个变量"USER_ID"和"REQ_URL"
+   3.2 编辑main.py，修改源码顶部3个变量"USER_ID"、"WEIBO_GSID"和"WEIBO_ST"
 
        USER_ID可以在下面的地址获得，最前面的<id>就是：
 
          http://api.twitter.com/1/users/show.xml?screen_name=YOURNAME
 
-       REQ_URL由第二步中的两个字符串组成，将值分别填入相应位置：
-
-         http://t.sina.cn/dpool/ttt/mblogDeal.php?st=XXXX&st=XXXX&gsid=AABBBCCDD
+       WEIBO_GSID和WEIBO_ST由第二步中的两个字符串组成，将值分别填入相应位置：
 
        ** 务必填写并且正确，否则同步无法成功;
        ** 这两个字符串自己用没问题，泄露给别人会有安全隐患;
 
        填完应该像这样：
-       USER_ID=1234567
-       REQ_URL='http://t.sina.cn/dpool/ttt/mblogDeal.php?st=XXXX&st=XXXX&gsid=AABBBCCDD'
+       USER_ID=1234567            # 整型
+       WEIBO_GSID='AABBBCCDD'     # 字符串
+       WEIBO_ST='XXYY'            # 字符串
 
 4. 部署kickassina到GAE
 
@@ -73,7 +72,8 @@ Tips:
 上述两个页面是给cron来调用，用户一般不需要通过web页面访问，所以提示信息较少。
 详细debug信息请访问appengine后台管理界面。
 
-GAE的fetchurl最大请求超时时间是10秒，因此你很有可能经常在后台看到下面的提示，
+GAE的fetchurl最大请求超时时间是10秒(直接web访问是如此，后台cron、taskqueue则最大600)，
+因此你很有可能经常在后台看到下面的提示:
 
     urlfetch: ApplicationError: 5
 
@@ -95,6 +95,13 @@ kickassina对于这种情况会继续不断请求上次未成功的请求直到�
 OK.
 
 另外，有些使用urlfetch请求成功了，但是没有见到你的tweet，那么很有可能是
-新浪对微博的审查，触发某些敏感词了。这时kickassina会标记这些tweets为
-failed，进入下一次同步会忽略它们。目前还没有接口给这些failed的tweets
-再一次同步的机会。
+新浪对微博的审查，触发某些敏感词了。尝试多次依然如此时kickassina会标记这些
+tweets为failed，进入下一次同步会忽略它们。目前还没有接口给这些failed的
+tweets再一次同步的机会。
+
+ChangeLog:
+Fri Apr 29 00:30:50 CST 2011
+ - 取消/setfailed，直接在kick的时候判断;
+ - 改进判断是否发布微博成功的方法;
+ - 改进配置，增加一些全局变量;
++--------------------------+

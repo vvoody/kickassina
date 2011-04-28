@@ -5,6 +5,3 @@ cron:
 - description:
   url: /fetchtweets
   schedule: every 10 minutes
-- description:
-  url: /setfailed
-  schedule: every 5 minutes

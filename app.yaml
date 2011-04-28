@@ -1,5 +1,5 @@
 application: kickassina
-version: 6
+version: 7
 runtime: python
 api_version: 1
 
@@ -30,9 +30,6 @@ handlers:
   script: main.py
   login: admin
 - url: /whyfailed/.*
-  script: main.py
-  login: admin
-- url: /setfailed
   script: main.py
   login: admin
 - url: /.*

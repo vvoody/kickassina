@@ -7,12 +7,18 @@ from google.appengine.api import urlfetch
 from django.utils import simplejson as json
 from google.appengine.ext.webapp.util import run_wsgi_app
 
-# hardcode is bad, but whatever...
-# replace this with your true user id
-# we prefer user_id than screen_name, cuz the former is immutable.
-USER_ID=None
-# fetch the url after logining to t.sina.cn
-REQ_URL=None
+# 'README' will tell you how to fill the below 3 values
+USER_ID=None  # user_id is immutable, better than screen_name
+WEIBO_GSID=None
+WEIBO_ST=None
+### DO NOT CHANGE THE FOLLOWING VALUES UNLESS YOU ARE SURE ###
+WEIBO_KICK_URL='http://t.sina.cn/dpool/ttt/mblogDeal.php?st=%s&st=%s&gsid=%s' % (WEIBO_ST, WEIBO_ST, WEIBO_GSID)
+WEIBO_HOME_URL='http://t.sina.cn/dpool/ttt/home.php?vt=1&gsid=%s' % WEIBO_GSID
+WEIBO_KICK_URL_DEADLINE=30
+WEIBO_HOME_URL_DEADLINE=12
+TRIED_TIMES_MAX=5
+###
+
 
 class DB(db.Model):
     kicked = db.BooleanProperty(default=False)
@@ -149,47 +155,69 @@ class FetchtweetsHandler(webapp.RequestHandler):
 
 
 class KickassHandler(webapp.RequestHandler):
+    def get_weibo_count(self):
+        global WEIBO_GSID, WEIBO_HOME_URL, WEIBO_HOME_URL_DEADLINE
+        try:
+            res = urlfetch.fetch(url=WEIBO_HOME_URL, deadline=WEIBO_HOME_URL_DEADLINE)
+        except Exception, e:
+            raise Exception(e)  # just exit...
+
+        import re
+        # match WEIBO_GSID">微博[362]</a>
+        patt = r'%s">微博\[(\d+)\]</a>' % WEIBO_GSID
+        v = re.search(patt, res.content)
+        return int(v.group(1))
+
     def get(self):
-        global REQ_URL
+        global TRIED_TIMES_MAX, WEIBO_KICK_URL, WEIBO_KICK_URL_DEADLINE
 
         t = NexttweetHandler.next_tweet()
         if t is None:
             self.response.out.write("No tweet to kick.")
             return
 
+        if t.tried_times > TRIED_TIMES_MAX:
+            t.failed = True
+            t.put()
+            logging.info("Set failed: %s" % t.tweet)
+            return
+
         headers = {'Content-Type': 'application/x-www-form-urlencoded',
                    'Useg-Agent': 'Opera/9.80 (Android; Linux; Opera Mobi/ADR-1011151731; U; en) Presto/2.5.28 Version/10.1'}
         form_fields = {'act': 'add', 'rl': '0', 'content': t.tweet.encode('utf-8')}
         form_data = urllib.urlencode(form_fields)
+
+        count_before_kick = self.get_weibo_count()
         try:
-            result = urlfetch.fetch(url=REQ_URL, payload=form_data,
+            result = urlfetch.fetch(url=WEIBO_KICK_URL, payload=form_data,
                                     method=urlfetch.POST, headers=headers,
-                                    deadline=10)
+                                    deadline=WEIBO_KICK_URL_DEADLINE)
         except Exception, e:
-            logging.error("kicked: %s\n%s" % (e, t.tweet))
-            self.response.out.write("%s" % "urlfetch failed...")
+            logging.error("kick: %s\n%s" % (e, t.tweet))
+            self.response.out.write("%s" % "kick: urlfetch failed...")
             return
 
-        msg = "Kicked!"
+        msg = "Kicked!"  # kicked, but maybe not posted
 
-        # tweet may be censored
-        if result.content.find("发布成功!") == -1:
-            t.whyfailed = result.content.decode("utf-8")
-            t.tried_times += 1
-            msg += " But maybe blocked or censored! Try again next time."
+        if result.content.find("发布成功!") == -1:  # not find it
+            count_after_kick = self.get_weibo_count()
+            # count incr 1 if really kicked, but of course there is still
+            # a probability that count is increased by user posting a tweet
+            # from the weibo page during our kicking procedure.
+            if count_before_kick < count_after_kick:
+                t.kicked = True
+                msg += " Count increased, maybe OK."
+            else:
+                t.whyfailed = result.content.decode("utf-8")
+                msg += " But maybe blocked or censored! Try again next time."
         else:
             t.kicked = True
+            msg += " Mostly succeeded."
 
-        logging.info(msg)
+        logging.info(msg + "\n%s" % t.tweet)
+        t.tried_times += 1
         t.put()
 
-
-class SetfailedHandler(webapp.RequestHandler):
-    def get(self):
-        tweets = DB.all().filter('tried_times >', 4)
-        for t in tweets:
-            t.failed = True
-            t.put()
 
 application = webapp.WSGIApplication([('/kickass', KickassHandler),
                                       ('/nexttweet', NexttweetHandler),
@@ -197,7 +225,6 @@ application = webapp.WSGIApplication([('/kickass', KickassHandler),
                                       ('/lasttweet', LasttweetHandler),
                                       ('/fetchtweets', FetchtweetsHandler),
                                       ('/whyfailed/(.*)', WhyfailedPage),
-                                      ('/setfailed', SetfailedHandler),
                                       ('/.*', MainPage)], debug=True)
 
 def main():
