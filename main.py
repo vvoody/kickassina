@@ -155,7 +155,7 @@ class FetchtweetsHandler(webapp.RequestHandler):
 
 
 class KickassHandler(webapp.RequestHandler):
-    def get_weibo_count(self):
+    def get_weibo_count(self, msg):
         global WEIBO_GSID, WEIBO_HOME_URL, WEIBO_HOME_URL_DEADLINE
         try:
             res = urlfetch.fetch(url=WEIBO_HOME_URL, deadline=WEIBO_HOME_URL_DEADLINE)
@@ -169,7 +169,7 @@ class KickassHandler(webapp.RequestHandler):
         try:
             count = int(v.group(1))
         except Exception, e:
-            logging.error("get count error: \n%s" % res.content)
+            logging.error("get count(%s) error: \n%s\n%s" % (msg, WEIBO_HOME_URL, res.content))
             raise Exception(e)
 
         return count
@@ -193,7 +193,7 @@ class KickassHandler(webapp.RequestHandler):
         form_fields = {'act': 'add', 'rl': '0', 'content': t.tweet.encode('utf-8')}
         form_data = urllib.urlencode(form_fields)
 
-        count_before_kick = self.get_weibo_count()
+        count_before_kick = self.get_weibo_count('before')
         try:
             result = urlfetch.fetch(url=WEIBO_KICK_URL, payload=form_data,
                                     method=urlfetch.POST, headers=headers,
@@ -204,24 +204,26 @@ class KickassHandler(webapp.RequestHandler):
             return
 
         msg = "Kicked!"  # kicked, but maybe not posted
+        t.tried_times += 1
+        t.put()
 
         if result.content.find("发布成功!") == -1:  # not find it
-            count_after_kick = self.get_weibo_count()
+            count_after_kick = self.get_weibo_count('after')
             # count incr 1 if really kicked, but of course there is still
             # a probability that count is increased by user posting a tweet
             # from the weibo page during our kicking procedure.
             if count_before_kick < count_after_kick:
                 t.kicked = True
-                msg += " Count increased, maybe OK."
+                msg += "(%d:%d) Count increased, maybe OK." % (count_before_kick, count_after_kick)
             else:
                 t.whyfailed = result.content.decode("utf-8")
-                msg += " But maybe blocked or censored! Try again next time."
+                msg += "(%d:%d) Mostly maybe blocked or censored! Try less." % (count_before_kick, count_after_kick)
+                t.tried_times += 1  # mostly blocked, no need try TRIED_TIMES_MAX times
         else:
             t.kicked = True
             msg += " Mostly succeeded."
 
         logging.info(msg + "\n%s" % t.tweet)
-        t.tried_times += 1
         t.put()
 
 

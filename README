@@ -100,6 +100,10 @@ tweets为failed，进入下一次同步会忽略它们。目前还没有接口�
 tweets再一次同步的机会。
 
 ChangeLog:
+Fri Apr 29 11:40:29 CST 2011
+ - 更精确的debug信息;
+ - 调整tried_times增加策略;
++--------------------------+
 Fri Apr 29 00:30:50 CST 2011
  - 取消/setfailed，直接在kick的时候判断;
  - 改进判断是否发布微博成功的方法;
