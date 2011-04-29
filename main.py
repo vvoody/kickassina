@@ -17,6 +17,7 @@ WEIBO_HOME_URL='http://t.sina.cn/dpool/ttt/home.php?vt=1&gsid=%s' % WEIBO_GSID
 WEIBO_KICK_URL_DEADLINE=30
 WEIBO_HOME_URL_DEADLINE=12
 TRIED_TIMES_MAX=5
+UA='Opera/9.80 (Android; Linux; Opera Mobi/ADR-1011151731; U; en) Presto/2.5.28 Version/10.1'
 ###
 
 
@@ -156,9 +157,12 @@ class FetchtweetsHandler(webapp.RequestHandler):
 
 class KickassHandler(webapp.RequestHandler):
     def get_weibo_count(self, msg):
-        global WEIBO_GSID, WEIBO_HOME_URL, WEIBO_HOME_URL_DEADLINE
+        global WEIBO_GSID, WEIBO_HOME_URL, WEIBO_HOME_URL_DEADLINE, UA
+
+        headers = {'User-Agent': UA}
         try:
-            res = urlfetch.fetch(url=WEIBO_HOME_URL, deadline=WEIBO_HOME_URL_DEADLINE)
+            res = urlfetch.fetch(url=WEIBO_HOME_URL, headers=headers,
+                                 deadline=WEIBO_HOME_URL_DEADLINE)
         except Exception, e:
             raise Exception(e)  # just exit...
 
@@ -175,7 +179,7 @@ class KickassHandler(webapp.RequestHandler):
         return count
 
     def get(self):
-        global TRIED_TIMES_MAX, WEIBO_KICK_URL, WEIBO_KICK_URL_DEADLINE
+        global TRIED_TIMES_MAX, WEIBO_KICK_URL, WEIBO_KICK_URL_DEADLINE, UA
 
         t = NexttweetHandler.next_tweet()
         if t is None:
@@ -189,7 +193,7 @@ class KickassHandler(webapp.RequestHandler):
             return
 
         headers = {'Content-Type': 'application/x-www-form-urlencoded',
-                   'Useg-Agent': 'Opera/9.80 (Android; Linux; Opera Mobi/ADR-1011151731; U; en) Presto/2.5.28 Version/10.1'}
+                   'User-Agent': UA}
         form_fields = {'act': 'add', 'rl': '0', 'content': t.tweet.encode('utf-8')}
         form_data = urllib.urlencode(form_fields)
 
