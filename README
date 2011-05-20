@@ -42,7 +42,9 @@ HOW
 
 4. 部署kickassina到GAE
 
-   请参考同类教程
+   请参考同类教程。
+   * 上传部署完毕务必到后台更改Version为app.yaml中定义的最新版本，否则服务器上
+     的代码依然是旧的。
 
 ====
 MORE
@@ -100,6 +102,9 @@ tweets为failed，进入下一次同步会忽略它们。目前还没有接口�
 tweets再一次同步的机会。
 
 ChangeLog:
+Fri May 20 15:33:00 CST 2011
+ - 增加部署说明，务必更新后台version;
++--------------------------+
 Fri Apr 29 14:28:12 CST 2011
  - 增加全局变量UA;
  - get_weibo_count()使用mobile的ua;
