@@ -29,6 +29,8 @@ class DB(db.Model):
     failed = db.BooleanProperty(default=False)    # bloody damn censorship or sina's block
     whyfailed = db.TextProperty()
     tried_times = db.IntegerProperty(default=0)
+    tco_urls = db.StringListProperty()
+    tco_expanded_urls = db.StringListProperty()
 
 
 class MainPage(webapp.RequestHandler):
@@ -116,7 +118,10 @@ class FetchtweetsHandler(webapp.RequestHandler):
     # fetch user's tweets which are not reply to anyone
     def fetch(self, sid):
         global USER_ID
-        req = 'http://api.twitter.com/1/statuses/user_timeline.json?user_id=%d&trim_user=true&include_rts=true&since_id=%d' % (USER_ID, sid)
+        # Twitter limits GAE quite a lot, but other proxy api is supported,
+        # see README
+        req = 'http://api.twitter.com/1/statuses/user_timeline.json?user_id=%d&trim_user=true&include_rts=true&include_entities=true&since_id=%d' % (USER_ID, sid)
+
         try:
             res = urlfetch.fetch(url=req, deadline=10)
         except Exception, e:
@@ -124,10 +129,12 @@ class FetchtweetsHandler(webapp.RequestHandler):
             return
 
         if res.status_code != 200:
-            msg = "twitter api maybe request too much."
+            msg = "twitter api maybe request too much.\n%s" % res.content
             logging.info(msg)
             self.response.out.write(msg)
             return
+        else:
+            logging.info("fetchtweets: we got something.")
 
         tweets = json.loads(res.content)
         for t in tweets:
@@ -138,9 +145,23 @@ class FetchtweetsHandler(webapp.RequestHandler):
             # you can use '@ bla bla bla...' to force not to kick
             if tweet[0] == '@' and tweet[1] in ' abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789':
                 continue
+            # store the t.co urls and their expanded urls
+            # 'include_entities' should be turned on in the api calling
+            tco_urls = []
+            tco_expanded_urls = []
+            for e in t["entities"]["urls"]:
+                if e["url"] and e["expanded_url"]:  # some urls not expanded(null)
+                    tco_urls.append(e["url"])
+                    tco_expanded_urls.append(e["expanded_url"])
 
-            DB(tweet_id=t["id"], tweet=t["text"], user_id=USER_ID).put()
+            try:
+                DB(tweet_id=t["id"], tweet=t["text"], user_id=USER_ID,
+                   tco_urls=tco_urls, tco_expanded_urls=tco_expanded_urls).put()
+            except Exception, e:
+                logging.error("save entity error: %s" % e)
+                break
             #self.response.out.write("tid: %d, t: %s, uid: %d" % (t["id"], t["text"], t["user"]["id"]))
+        # end for
 
     def get_since_id(self):
         if DB.all().count(1) == 0:  # it's really no any tweet fetched
@@ -156,6 +177,18 @@ class FetchtweetsHandler(webapp.RequestHandler):
 
 
 class KickassHandler(webapp.RequestHandler):
+    def unwrap_tco(self, t, tco_pairs):
+        """Get the original url which is wrapped by t.co shorten url service.
+
+        Twitter forces to wrap all urls using t.co, but t.co urls are blocked by weibo.com.
+
+        tco_pairs = [(u'http://t.co/AbC123', u'http://looooongurl.com/blabla')]
+        """
+
+        for tco_url, tco_expanded_url in tco_pairs:
+            t = t.replace(tco_url, tco_expanded_url)
+        return t
+
     def get_weibo_count(self, msg):
         global WEIBO_GSID, WEIBO_HOME_URL, WEIBO_HOME_URL_DEADLINE, UA
 
@@ -194,7 +227,8 @@ class KickassHandler(webapp.RequestHandler):
 
         headers = {'Content-Type': 'application/x-www-form-urlencoded',
                    'User-Agent': UA}
-        form_fields = {'act': 'add', 'rl': '0', 'content': t.tweet.encode('utf-8')}
+        t_expanded = self.unwrap_tco(t.tweet, zip(t.tco_urls, t.tco_expanded_urls))
+        form_fields = {'act': 'add', 'rl': '0', 'content': t_expanded.encode('utf-8')}
         form_data = urllib.urlencode(form_fields)
 
         count_before_kick = self.get_weibo_count('before')
@@ -203,7 +237,7 @@ class KickassHandler(webapp.RequestHandler):
                                     method=urlfetch.POST, headers=headers,
                                     deadline=WEIBO_KICK_URL_DEADLINE)
         except Exception, e:
-            logging.error("kick: %s\n%s" % (e, t.tweet))
+            logging.error("kick: %s\n%s" % (e, t_expanded))
             self.response.out.write("%s" % "kick: urlfetch failed...")
             return
 
@@ -227,7 +261,7 @@ class KickassHandler(webapp.RequestHandler):
             t.kicked = True
             msg += " Mostly succeeded."
 
-        logging.info(msg + "\n%s" % t.tweet)
+        logging.info(msg + "\n%s" % t_expanded)
         t.put()
 
 
