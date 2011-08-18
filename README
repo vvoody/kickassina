@@ -101,7 +101,49 @@ OK.
 tweets为failed，进入下一次同步会忽略它们。目前还没有接口给这些failed的
 tweets再一次同步的机会。
 
+=========
+API PROXY
+=========
+在获取用户的推时使用的是api.twitter.com/1/，并且未使用twitter api key，
+由于本应用基于GAE而Twitter对于GAE过多的请求限制比较多，经常会超过限额。因此，
+理论上本应用可以支持所有第三方twitter api proxy。
+
+* nginx
+
+  /etc/nginx/nginx.conf:
+
+    server {
+        listen 80;
+        server_name api.ooo.xxx;
+
+        location = /tw/get_tl/ {
+            if ($arg_user_id !~ [0-9]+) {
+                return 400;
+            }
+            if ($arg_since_id !~ [0-9]+) {
+                return 400;
+            }
+            proxy_pass http://api.twitter.com/1/statuses/user_timeline.json?user_id=$arg_user_id&trim_user=true&include_rts=true&include_entities=true&since_id=$arg_since_id?;
+        }
+    }
+
+  nginx在如上配置后，可以替换main.py中FetchtweetsHandler的req一行为：
+
+    "req = 'http://api.ooo.xxx/tw/get_tl/?user_id=%d&since_id=%d' % (USER_ID, sid)"
+
+* 其他
+
+  请根据所使用的api proxy地址作相应调整。如果希望能多人使用请保留user_id和since_id接口。
+
+
+
 ChangeLog:
+Thu Aug 18 14:03:07 CST 2011
+ - 增加第三方api搭建使用说明，详见README;
++--------------------------+
+Thu Aug 18 11:49:57 CST 2011
+ - 还原t.co链接为原始链接，因为新浪微博把t.co列入恶意网址;
++--------------------------+
 Fri May 20 15:33:00 CST 2011
  - 增加部署说明，务必更新后台version;
 +--------------------------+
