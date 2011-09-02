@@ -11,6 +11,8 @@ from google.appengine.ext.webapp.util import run_wsgi_app
 USER_ID=None  # user_id is immutable, better than screen_name
 WEIBO_GSID=None
 WEIBO_ST=None
+# Be careful if you want to modify the request api url
+TWITTER_REQAPI = 'http://api.twitter.com/1/statuses/user_timeline.json?user_id=%d&trim_user=true&include_rts=true&include_entities=true&since_id=%d'
 ### DO NOT CHANGE THE FOLLOWING VALUES UNLESS YOU ARE SURE ###
 WEIBO_KICK_URL='http://t.sina.cn/dpool/ttt/mblogDeal.php?st=%s&st=%s&gsid=%s' % (WEIBO_ST, WEIBO_ST, WEIBO_GSID)
 WEIBO_HOME_URL='http://t.sina.cn/dpool/ttt/home.php?vt=1&gsid=%s' % WEIBO_GSID
@@ -117,10 +119,10 @@ class LasttweetHandler(webapp.RequestHandler):
 class FetchtweetsHandler(webapp.RequestHandler):
     # fetch user's tweets which are not reply to anyone
     def fetch(self, sid):
-        global USER_ID
+        global USER_ID, TWITTER_REQAPI
         # Twitter limits GAE quite a lot, but other proxy api is supported,
         # see README
-        req = 'http://api.twitter.com/1/statuses/user_timeline.json?user_id=%d&trim_user=true&include_rts=true&include_entities=true&since_id=%d' % (USER_ID, sid)
+        req = TWITTER_REQAPI % (USER_ID, sid)
 
         try:
             res = urlfetch.fetch(url=req, deadline=10)
