@@ -13,6 +13,9 @@ WEIBO_GSID=None
 WEIBO_ST=None
 # Be careful if you want to modify the request api url
 TWITTER_REQAPI = 'http://api.twitter.com/1/statuses/user_timeline.json?user_id=%d&trim_user=true&include_rts=true&include_entities=true&since_id=%d'
+# blocked by Weibo.com
+INNOCENT_NETLOCS = ['goo.gl', 'bit.ly', 'is.gd', 'tinyurl.com']
+# Configuration END.
 ### DO NOT CHANGE THE FOLLOWING VALUES UNLESS YOU ARE SURE ###
 WEIBO_KICK_URL='http://t.sina.cn/dpool/ttt/mblogDeal.php?st=%s&st=%s&gsid=%s' % (WEIBO_ST, WEIBO_ST, WEIBO_GSID)
 WEIBO_HOME_URL='http://t.sina.cn/dpool/ttt/home.php?vt=1&gsid=%s' % WEIBO_GSID
@@ -117,6 +120,52 @@ class LasttweetHandler(webapp.RequestHandler):
             self.response.out.write(last.tweet)
 
 class FetchtweetsHandler(webapp.RequestHandler):
+    @classmethod
+    def expand(self, url):
+        """Expand short url to its original."""
+
+        try:
+            res = urlfetch.fetch(url=url, method="HEAD", follow_redirects=False, deadline=10)
+        except Exception, e:
+            logging.error("expand url %s failed\nerror:%s" % (url, e))
+            # there will still be an chance to expand the url when kicks,
+            # so leave a flag here.
+            return None
+
+        return res.headers['Location'] if res.status_code in (301, 302) else url
+
+    def expand_tco_urls(self, tcos):
+        """Return pairs of t.co short urls and their expanded urls.
+        If the expanded url is in the malice urls list of Weibo.com, expand
+        it to the unshorten one.
+
+        < [{"url":"http://t.co/xxx", "expanded_url":"http://loooooongurl"},
+           {"url":"http://t.co/yyy", "expanded_url":"http://goo.gl/abc"}]
+
+        > (["http://t.co/xxx", "http://t.co/yyy"],
+           ["http://loooooongurl", "http://zzzzzzzzzzzzzz"])
+
+        Twitter forces to wrap the url longer than 20 characters regardless of
+        whether the url was already shortened by other services like goo.gl or
+        bit.ly.
+
+        Support expanding short urls see INNOCENT_NETLOCS
+        """
+        from urlparse import urlsplit
+        global INNOCENT_NETLOCS
+
+        tco_urls = []
+        tco_expanded_urls = []
+        for e in tcos:
+            if e["url"] and e["expanded_url"]:  # some urls not expanded(null)
+                tco_urls.append(e["url"])
+                u = e["expanded_url"]
+                o = urlsplit(u)
+                uu = self.expand(u) if o.netloc in INNOCENT_NETLOCS else u
+                tco_expanded_urls.append(uu)
+
+        return (tco_urls, tco_expanded_urls)
+
     # fetch user's tweets which are not reply to anyone
     def fetch(self, sid):
         global USER_ID, TWITTER_REQAPI
@@ -147,14 +196,10 @@ class FetchtweetsHandler(webapp.RequestHandler):
             # you can use '@ bla bla bla...' to force not to kick
             if tweet[0] == '@' and tweet[1] in ' abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789':
                 continue
-            # store the t.co urls and their expanded urls
+            # store the t.co like(goo.gl/bit.ly) urls and their expanded urls
             # 'include_entities' should be turned on in the api calling
-            tco_urls = []
-            tco_expanded_urls = []
-            for e in t["entities"]["urls"]:
-                if e["url"] and e["expanded_url"]:  # some urls not expanded(null)
-                    tco_urls.append(e["url"])
-                    tco_expanded_urls.append(e["expanded_url"])
+            # "entities":{"urls":["url":"", "expanded_url":""]}
+            tco_urls, tco_expanded_urls = self.expand_tco_urls(t["entities"]["urls"])
 
             try:
                 DB(tweet_id=t["id"], tweet=t["text"], user_id=USER_ID,
@@ -180,16 +225,27 @@ class FetchtweetsHandler(webapp.RequestHandler):
 
 class KickassHandler(webapp.RequestHandler):
     def unwrap_tco(self, t, tco_pairs):
-        """Get the original url which is wrapped by t.co shorten url service.
+        """Replace t.co urls in the tweet with the expanded ones.
 
         Twitter forces to wrap all urls using t.co, but t.co urls are blocked by weibo.com.
+
+        parameter t is a datastore entity.
 
         tco_pairs = [(u'http://t.co/AbC123', u'http://looooongurl.com/blabla')]
         """
 
+        tweet = t.tweet
         for tco_url, tco_expanded_url in tco_pairs:
-            t = t.replace(tco_url, tco_expanded_url)
-        return t
+            # yet another chance to expand the short url not succeeded last time
+            if tco_expanded_url is None:
+                u = FetchtweetsHandler.expand(tco_url)
+                if u is None:
+                    tco_expanded_url = tco_url
+                else:
+                    t.tco_expanded_urls[t.tco_urls.index(tco_url)] = u
+                    t.put()
+            tweet = tweet.replace(tco_url, tco_expanded_url)
+        return tweet
 
     def get_weibo_count(self, msg):
         global WEIBO_GSID, WEIBO_HOME_URL, WEIBO_HOME_URL_DEADLINE, UA
@@ -229,7 +285,7 @@ class KickassHandler(webapp.RequestHandler):
 
         headers = {'Content-Type': 'application/x-www-form-urlencoded',
                    'User-Agent': UA}
-        t_expanded = self.unwrap_tco(t.tweet, zip(t.tco_urls, t.tco_expanded_urls))
+        t_expanded = self.unwrap_tco(t, zip(t.tco_urls, t.tco_expanded_urls))
         form_fields = {'act': 'add', 'rl': '0', 'content': t_expanded.encode('utf-8')}
         form_data = urllib.urlencode(form_fields)
 
