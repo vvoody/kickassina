@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import urllib
 import logging
+import re
 from google.appengine.ext import db
 from google.appengine.ext import webapp
 from google.appengine.api import urlfetch
@@ -15,6 +16,11 @@ WEIBO_ST=None
 TWITTER_REQAPI = 'http://api.twitter.com/1/statuses/user_timeline.json?user_id=%d&trim_user=true&include_rts=true&include_entities=true&since_id=%d'
 # blocked by Weibo.com
 INNOCENT_NETLOCS = ['goo.gl', 'bit.ly', 'is.gd', 'tinyurl.com']
+# not show user ids in the tweet due to disturbing and security,
+# replace "@username" with customized string("@nil" by default),
+# instead string can be empty, that means remove all the mentions.
+PLZ_HIDE_ID = True
+PLZ_HIDE_ID_INSTEAD = "@nil"
 # Configuration END.
 ### DO NOT CHANGE THE FOLLOWING VALUES UNLESS YOU ARE SURE ###
 WEIBO_KICK_URL='http://t.sina.cn/dpool/ttt/mblogDeal.php?st=%s&st=%s&gsid=%s' % (WEIBO_ST, WEIBO_ST, WEIBO_GSID)
@@ -224,6 +230,25 @@ class FetchtweetsHandler(webapp.RequestHandler):
 
 
 class KickassHandler(webapp.RequestHandler):
+    def hide_id(self, tweet, instead_str):
+        """Replace "@username" in the tweet with other string like "@nil".
+
+        Name user id will have same postfix, like:
+        "Hej @blabla RT @blabla: hello @yadayada"  =>
+        "Hej @nil_0 RT @nil_0: hello @nil_1"
+
+        If instead_str is empty, every "@xxx" will be removed.
+        """
+
+        ids = re.findall('@\w+', tweet)
+        if ids:
+            ids = list(set(ids))
+            for i in range(len(ids)):
+                tweet = tweet.replace(ids[i],
+                                      instead_str + "_%d" % i if instead_str else "")
+
+        return tweet
+
     def unwrap_tco(self, t, tco_pairs):
         """Replace t.co urls in the tweet with the expanded ones.
 
@@ -257,7 +282,6 @@ class KickassHandler(webapp.RequestHandler):
         except Exception, e:
             raise Exception(e)  # just exit...
 
-        import re
         # match WEIBO_GSID">微博[362]</a>
         patt = r'%s">微博\[(\d+)\]</a>' % WEIBO_GSID
         v = re.search(patt, res.content)
@@ -270,7 +294,8 @@ class KickassHandler(webapp.RequestHandler):
         return count
 
     def get(self):
-        global TRIED_TIMES_MAX, WEIBO_KICK_URL, WEIBO_KICK_URL_DEADLINE, UA
+        global TRIED_TIMES_MAX, WEIBO_KICK_URL, WEIBO_KICK_URL_DEADLINE, UA, \
+               PLZ_HIDE_ID, PLZ_HIDE_ID_INSTEAD
 
         t = NexttweetHandler.next_tweet()
         if t is None:
@@ -286,6 +311,7 @@ class KickassHandler(webapp.RequestHandler):
         headers = {'Content-Type': 'application/x-www-form-urlencoded',
                    'User-Agent': UA}
         t_expanded = self.unwrap_tco(t, zip(t.tco_urls, t.tco_expanded_urls))
+        t_expanded = self.hide_id(t_expanded, PLZ_HIDE_ID_INSTEAD) if PLZ_HIDE_ID else t_expanded
         form_fields = {'act': 'add', 'rl': '0', 'content': t_expanded.encode('utf-8')}
         form_data = urllib.urlencode(form_fields)
 
