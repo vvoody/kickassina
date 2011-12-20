@@ -20,7 +20,7 @@ INNOCENT_NETLOCS = ['goo.gl', 'bit.ly', 'is.gd', 'tinyurl.com']
 # replace "@username" with customized string("@nil" by default),
 # instead string can be empty, that means remove all the mentions.
 PLZ_HIDE_ID = True
-PLZ_HIDE_ID_INSTEAD = "@nil"
+PLZ_HIDE_ID_INSTEAD = "@x"
 # Configuration END.
 ### DO NOT CHANGE THE FOLLOWING VALUES UNLESS YOU ARE SURE ###
 WEIBO_KICK_URL='http://t.sina.cn/dpool/ttt/mblogDeal.php?st=%s&st=%s&gsid=%s' % (WEIBO_ST, WEIBO_ST, WEIBO_GSID)
