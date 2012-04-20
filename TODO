@@ -1,0 +1,3 @@
+* regularly, send a digest email which contains which tweets failed to kick;
+* ??use task queues to kick tweet instead of cron every minute;
+* ??move configuration from main.py to datastore;
