@@ -23,8 +23,8 @@ PLZ_HIDE_ID = True
 PLZ_HIDE_ID_INSTEAD = "@x"
 # Configuration END.
 ### DO NOT CHANGE THE FOLLOWING VALUES UNLESS YOU ARE SURE ###
-WEIBO_KICK_URL='http://t.sina.cn/dpool/ttt/mblogDeal.php?st=%s&st=%s&gsid=%s' % (WEIBO_ST, WEIBO_ST, WEIBO_GSID)
-WEIBO_HOME_URL='http://t.sina.cn/dpool/ttt/home.php?vt=1&gsid=%s' % WEIBO_GSID
+WEIBO_KICK_URL='http://weibo.cn/mblog/sendmblog?st=%s&st=%s&vt=4&gsid=%s' % (WEIBO_ST, WEIBO_ST, WEIBO_GSID)
+WEIBO_HOME_URL='http://weibo.cn/?vt=1&gsid=%s' % WEIBO_GSID
 WEIBO_KICK_URL_DEADLINE=30
 WEIBO_HOME_URL_DEADLINE=12
 TRIED_TIMES_MAX=5
@@ -312,7 +312,7 @@ class KickassHandler(webapp.RequestHandler):
                    'User-Agent': UA}
         t_expanded = self.unwrap_tco(t, zip(t.tco_urls, t.tco_expanded_urls))
         t_expanded = self.hide_id(t_expanded, PLZ_HIDE_ID_INSTEAD) if PLZ_HIDE_ID else t_expanded
-        form_fields = {'act': 'add', 'rl': '0', 'content': t_expanded.encode('utf-8')}
+        form_fields = {'rl': '0', 'content': t_expanded.encode('utf-8')}
         form_data = urllib.urlencode(form_fields)
 
         count_before_kick = self.get_weibo_count('before')
