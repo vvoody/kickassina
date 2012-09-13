@@ -18,8 +18,8 @@ HOW
    如果浏览器会提示将页面保存为php文件，将无法顺利登录，请尝试别的浏览器，
    比如Opera、Google Chrome。
 
-2. 使用浏览器的开发者工具
-   查看首页源码，找到"gsid="开头的字符串，以及"st="，记录下他们的值;
+2. 查看首页源码，找到"gsid="开头的字符串，以及"st="，记录下他们的值。
+   gsid通常比较长，40位左右，st则4位左右。
 
 3. 下载kickassina源码
 
@@ -89,8 +89,7 @@ kickassina对于这种情况会继续不断请求上次未成功的请求直到�
        #!/bin/sh
        content=$(curl http://xxxxxx.appspot.com/lasttweet)
        if [ ! "$content" = "" ]; then
-           curl -L -F "act=add" -F "rl=0" -F "content=" \
-                http://t.sina.cn/dpool/ttt/mblogDeal.php?st=XXXX&st=XXXX&gsid=AABBBCCDD
+           curl -L -d "content=$content" "http://weibo.cn/mblog/sendmblog?st=XXXX&vt=4&gsid=AABBBCCDD"
        fi
 
     2. 添加上述shell脚本到cron
@@ -100,7 +99,7 @@ OK.
 另外，有些使用urlfetch请求成功了，但是没有见到你的tweet，那么很有可能是
 新浪对微博的审查，触发某些敏感词了。尝试多次依然如此时kickassina会标记这些
 tweets为failed，进入下一次同步会忽略它们。目前还没有接口给这些failed的
-tweets再一次同步的机会。
+tweets再一次同步的机会[TODO 1]。
 
 =========
 API PROXY
