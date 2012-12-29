@@ -2,3 +2,4 @@
 * ??use task queues to kick tweet instead of cron every minute;
 * ??move configuration from main.py to datastore;
 * white/black list of showing user id or not;
+* multple-reset failed tweets

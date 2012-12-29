@@ -21,6 +21,10 @@ HOW
 2. 查看首页源码，找到"gsid="开头的字符串，以及"st="，记录下他们的值。
    gsid通常比较长，40位左右，st则4位左右。
 
+   或者使用浏览器的开发者工具在登陆 http://weibo.cn/ 后发一条测试微博，抓取数据得知。
+   下图红色划线部分的st和gsid两个值是下一步所需要的：
+   ![](/static/kickassine-howto.png)
+
 3. 下载kickassina源码
 
    3.1 https://github.com/vvoody/kickassina/archives/master
@@ -138,6 +142,9 @@ API PROXY
 
 
 ChangeLog:
+Sat Dec 29 21:03:18 UTC 2012
+ - 增加配图说明如果获取gsid和st的值;
++--------------------------+
 Tue Dec 20 13:56:27 CST 2011
  - 隐去tweet中的用户名，为了不打扰和Twitter用户名同名的新浪微博用户，以及安全性;
 +--------------------------+
