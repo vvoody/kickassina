@@ -22,8 +22,8 @@ HOW
    gsid通常比较长，40位左右，st则4位左右。
 
    或者使用浏览器的开发者工具在登陆 http://weibo.cn/ 后发一条测试微博，抓取数据得知。
-   下图红色划线部分的st和gsid两个值是下一步所需要的：
-   ![](https://raw.github.com/vvoody/kickassina/master/static/kickassina-howto.png)
+   下面链接中的红色划线部分的st和gsid两个值是下一步所需要的：
+   https://raw.github.com/vvoody/kickassina/master/static/kickassina-howto.png
 
 3. 下载kickassina源码
 
